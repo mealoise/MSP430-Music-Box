@@ -20,17 +20,17 @@ void setSong();
 void updateCurr();
 void playNote();
 
-typedef enum
+typedef enum // state machine for generate state of music box
 {
     WELCOME, SONGLIST, COUNTDOWN, PLAYINGSONG, DONOTHING1,
 } MusicState;
 
-typedef enum
+typedef enum // state machine for state of countdown
 {
     DONOTHING, PRINT1, PRINT2, PRINT3, PRINTGO, UPDATE,
 } CountState;
 
-typedef enum
+typedef enum // state machine for playing a song
 {
     STARTBUZZER, DURATION, DONOTHING2,
 } NoteState;
@@ -38,6 +38,8 @@ typedef enum
 MusicState state = WELCOME;
 CountState stateC = DONOTHING;
 NoteState stateN = DONOTHING2;
+
+// setting constants that help with execution
 
 unsigned int song = 0;
 bool countdown_complete = false;
@@ -51,17 +53,17 @@ unsigned int current_length;
 unsigned int temp_note = 0;
 volatile unsigned int k = 30;
 
-unsigned int toxic_notes[] = { 523, 587, 622, 587, 523, 0, 523, 622, 523, 622,
+unsigned int toxic_notes[] = { 523, 587, 622, 587, 523, 0, 523, 622, 523, 622, // pitch frequencies to be played by buzzer
                                0, 523, 622, 587, 523, 0, 523, 523, 523, 622,
                                523, 622, 0, 466, 587, 523, 466, 0, 784, 494,
                                784, 494, 0, 784, 880, 0, 932, 1397, 880, 784, 0,
                                784, 784, 784, 880, 880, 880, 932, 1397, 880,
                                784, 0, 698, 784, 932, 784, 698 };
-unsigned int toxic_duration[] = { 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 4, 1, 1, 1, 1,
+unsigned int toxic_duration[] = { 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 4, 1, 1, 1, 1, // ratio of notes in comparison to the shortest note used in song
                                   2, 1, 1, 1, 1, 1, 1, 4, 1, 1, 1, 1, 2, 2, 1,
                                   1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1,
                                   1, 2, 1, 1, 2, 2, 2, 2, 8, 2, 1, 1, 1, 1, 2 };
-unsigned int happy_birthday_notes[] = { 349, 349, 392, 329, 494, 440, 349, 349,
+unsigned int happy_birthday_notes[] = { 349, 349, 392, 329, 494, 440, 349, 349, // a very out of tune rendition of happy birthday
                                         392, 349, 523, 494, 349, 349, 659,
                                         587, 494, 466, 392, 659, 659, 587,
                                         494, 523, 494 };
@@ -73,15 +75,15 @@ void main(void)
 
 {
 
-    WDTCTL = WDTPW | WDTHOLD;
+    WDTCTL = WDTPW | WDTHOLD; // turning off watchdog timer b/c it's bad for this
 
     // Useful code starts here
     initLeds();
     configDisplay();
     configKeypad();
     configTimer();
-    BuzzerOn();
-    _BIS_SR(GIE);
+    BuzzerOn(); // using this to configure buzzer, does not play a pitch
+    _BIS_SR(GIE); // global interrupts enabled
 
     // *** Intro Screen ***
     Graphics_clearDisplay(&g_sContext); // Clear the display
@@ -92,15 +94,19 @@ void main(void)
 
     while (1)    // Forever loop
     {
-        currKey = getKey();
+        currKey = getKey(); // checking keypad input for functionalities of music box below switch statements
 
         switch (state)
         {
         case WELCOME:
+            // reset constants that may be altered before returning to WELCOME for proper functionality
             current_note = 0;
             song = 0;
             execute_once = true;
             countdown_complete = false;
+                
+            // printing welcome screen
+                
             Graphics_drawStringCentered(&g_sContext, "HELLO",
             AUTO_STRING_LENGTH,
                                         64, 40,
@@ -126,14 +132,14 @@ void main(void)
                                         64, 100,
                                         TRANSPARENT_TEXT);
 
-            Graphics_flushBuffer(&g_sContext);
+            Graphics_flushBuffer(&g_sContext); // so we can actually see the text
 
-            currKey = getKey();
+            currKey = getKey(); // just in case
             if (currKey == '*')
             {
                 state = SONGLIST;
-                P1OUT |= BIT0;      // Set the P1.0 as 1 (High)
-                Graphics_clearDisplay(&g_sContext);
+                P1OUT |= BIT0;      // Set the P1.0 as 1 (High), LED on
+                Graphics_clearDisplay(&g_sContext); // clear before next state
             }
             break;
 
@@ -159,13 +165,10 @@ void main(void)
             AUTO_STRING_LENGTH,
                                         64, 90,
                                         TRANSPARENT_TEXT);
-//            Graphics_drawStringCentered(&g_sContext, "(3) HOT CROSS BUNS by UNKNOWN",
-//                        AUTO_STRING_LENGTH,
-//                                                    64, 80,
-//                                                    TRANSPARENT_TEXT);
+
             Graphics_flushBuffer(&g_sContext);
             currKey = getKey();
-            if (currKey == '1' || currKey == '2')
+            if (currKey == '1' || currKey == '2') // if either of two valid buttons pressed
             {
                 setSong();
                 Graphics_clearDisplay(&g_sContext);
@@ -176,20 +179,20 @@ void main(void)
         case COUNTDOWN:
 //            if (execute_once)
 //            {
-            updateCurr();
-            state = DONOTHING1;
+            updateCurr(); // keeps record of current time
+            state = DONOTHING1; // handing off to another state machine for countdown
             stateC = PRINT1;
 //            }
             break;
         case PLAYINGSONG:
-            if (current_note + 1 < song_length)
+            if (current_note + 1 < song_length) // ensures song stops playing when end of song is reached
             {
-                stateN = STARTBUZZER;
+                stateN = STARTBUZZER; // shifting control to other state machine
                 state = DONOTHING1;
             }
             else
             {
-                state = WELCOME;
+                state = WELCOME; // return to WELCOME when song complete
             }
             break;
         case DONOTHING1:
@@ -207,13 +210,13 @@ void main(void)
                                         64, 60,
                                         TRANSPARENT_TEXT);
             Graphics_flushBuffer(&g_sContext);
-            P4OUT |= BIT7;
-            if (curr_time + 100 < timer)
+            P4OUT |= BIT7; // flashing respective LEDs for countdown aesthetic
+            if (curr_time + 100 < timer) // rough estimate of passage of time
             {
-                P4OUT &= ~BIT7;
+                P4OUT &= ~BIT7; // have to turn off LEDs before next state for blinking in-time effect
                 Graphics_clearDisplay(&g_sContext);
                 stateC = PRINT2;
-                curr_time = timer;
+                curr_time = timer; // reset global timekeeping variable
             }
             break;
         case PRINT2:
@@ -222,7 +225,7 @@ void main(void)
                                         64, 60,
                                         TRANSPARENT_TEXT);
             Graphics_flushBuffer(&g_sContext);
-            P1OUT |= BIT1;
+            P1OUT |= BIT1; // flashing respective LEDs for countdown aesthetic
             if (curr_time + 100 < timer)
             {
                 P1OUT &= ~BIT0;
@@ -237,7 +240,7 @@ void main(void)
                                         64, 60,
                                         TRANSPARENT_TEXT);
             Graphics_flushBuffer(&g_sContext);
-            P4OUT |= BIT7;
+            P4OUT |= BIT7; // flashing respective LEDs for countdown aesthetic
             if (curr_time + 100 < timer)
             {
                 P4OUT &= ~BIT7;
@@ -252,7 +255,7 @@ void main(void)
                                         64, 60,
                                         TRANSPARENT_TEXT);
             Graphics_flushBuffer(&g_sContext);
-            P4OUT |= BIT7;
+            P4OUT |= BIT7; // flashing respective LEDs for countdown aesthetic
             P1OUT |= BIT0;
             if (curr_time + 200 < timer)
             {
@@ -264,7 +267,7 @@ void main(void)
             break;
         case UPDATE:
 
-            stateC = DONOTHING;
+            stateC = DONOTHING; // shifting control back to original state machine 
             state = PLAYINGSONG;
 
             break;
@@ -278,9 +281,9 @@ void main(void)
             // change
             if (song == 1)
             {
-                temp_note = *(toxic_notes + current_note);
-                current_length = *(toxic_duration + current_note);
-                updateCurr();
+                temp_note = *(toxic_notes + current_note); // iterating through array for frequency of current note
+                current_length = *(toxic_duration + current_note); // iterating through array for duration of current note
+                updateCurr(); // update global timekeeping variable
                 stateN = DURATION;
 
             }
@@ -293,11 +296,11 @@ void main(void)
             }
             break;
         case DURATION:
-            if ((curr_time + (current_length*k)) < timer)
-            {
+            if ((curr_time + (current_length*k)) < timer)  // multiplying duration of note by some value k, k can be adjusted to alter speed of song
+            {   // ensures note plays to fuull duration and then stops
                 BuzzerOff();
                 current_note++;
-                state = PLAYINGSONG;
+                state = PLAYINGSONG; // shifting back control to original state machine -- loops until song is finished
                 stateN = DONOTHING2;
             }
             else
@@ -307,7 +310,7 @@ void main(void)
             break;
         }
 
-        if (currKey == '#')
+        if (currKey == '#') // at any point, '#' key returns user to WELCOME state/screen
         {
             state = WELCOME;
             stateN = DONOTHING2;
@@ -317,53 +320,39 @@ void main(void)
         }
 
         if (currKey == '8'){
-            state = DONOTHING1;
+            state = DONOTHING1; // at any point of play, '8' key pauses song play
             stateC = DONOTHING;
             stateN = DONOTHING2;
             P4OUT &= ~BIT7;
             P1OUT |= BIT0;
             BuzzerOff();
         }
-        if (currKey == '9'){
+        if (currKey == '9'){ // at any point of play, '9' key resumes a song from paused 
             state = PLAYINGSONG;
             P1OUT &= ~BIT0;
             P4OUT |= BIT7;
         }
 
-        if(currKey == '3'){
-            k = 20;
+        if(currKey == '3'){ // the following keys change the value that determines speed of song at any point in play
+            k = 20; // fastest setting
         }
         if(currKey == '4'){
             k = 25;
         }
         if(currKey == '5'){
-            k = 30;
+            k = 30; // default setting
         }
         if(currKey == '6'){
             k = 35;
         }
         if(currKey == '7'){
-            k = 40;
+            k = 40; // slowest setting
         }
-
-//        if (currKey)
-//        {
-//            dispThree[1] = currKey;
-//            // Draw the new character to the display
-//            Graphics_drawStringCentered(&g_sContext, dispThree, dispSz, 64, 90, OPAQUE_TEXT);
-//
-//            // Refresh the display so it shows the new data
-//            Graphics_flushBuffer(&g_sContext);
-//
-//            // wait awhile before clearing LEDs
-//            swDelay(1);
-//            setLeds(0);
-//        }
 
     }  // end while (1)
 }
 
-void swDelay(char numLoops)
+void swDelay(char numLoops) // unused because of blocking
 {
 
     volatile unsigned int i, j;
@@ -377,23 +366,22 @@ void swDelay(char numLoops)
 }
 
 void configUserLED(char inbits)
-{  // probably maybe
+{  
+    P4SEL &= ~BIT7; // configure P4.7 (LED2) for Digital I/O
+    P4DIR |= BIT7; // As output
+    P4OUT |= inbits & BIT7; 
 
-    P4SEL &= ~BIT7;
-    P4DIR |= BIT7;
-    P4OUT |= inbits & BIT7;
-
-    P1SEL &= ~BIT0;
+    P1SEL &= ~BIT0; // configure P1.0 (LED1) for Digital I/O
     P1DIR |= BIT0;
     P1OUT |= (inbits & BIT0) << 7;
-
 }
 
 void setSong()
 {
-    currKey = getKey();
-    if (currKey == 0x31)
+    currKey = getKey(); // just in case
+    if (currKey == 0x31) // reading in using hex value of ASCII
     {
+        // setting constants based on input from keypad (song choice)
         song = 1;
         song_length = 57;
         state = COUNTDOWN;
@@ -404,11 +392,6 @@ void setSong()
         song_length = 25;
         state = COUNTDOWN;
     }
-//    else if (currKey == 0x33)
-//    {
-//        song = 3;
-//        state = COUNTDOWN;
-//    }
     else
     {
         Graphics_clearDisplay(&g_sContext);
@@ -420,15 +403,15 @@ void setSong()
         state = SONGLIST;
     }
 }
-void updateCurr()
+void updateCurr() // I dont really need this upon reflection
 {
     curr_time = timer;
 }
 
 void configTimer()
 {
-    TA2CTL = TASSEL_1 + ID_0 + MC_1;
-    TA2CCR0 = 327; // every 0.01 second
+    TA2CTL = TASSEL_1 + ID_0 + MC_1; //ACLK, DIV = 0, Up-Mode
+    TA2CCR0 = 327; // every 0.01 second, timer interrupt
     TA2CCTL0 = CCIE;
 }
 
